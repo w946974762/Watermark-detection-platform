@@ -1,0 +1,4 @@
+# Name                    Version                   Build      Channel
+python                    3.12.9
+ffmpeg                    3.4.2                         0      conda-forge
+#建议使用命令行conda install -c conda-forge ffmpeg进行安装

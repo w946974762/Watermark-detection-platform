@@ -1,0 +1,4 @@
+Pillow
+piexif
+pillow-heif
+requests 

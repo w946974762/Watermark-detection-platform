@@ -1,0 +1,241 @@
+人工智能生成合成内容标识嵌入与检测接口文档
+1. 图像 (Image)
+1.1 元数据隐式标识嵌入
+def EmbedImageImplicitLabel(OriginalImagePath: str, ImplicitLabel: str, 
+ResultFilePath: str) -> str:
+"""
+说明：
+ 将隐式标识信息嵌入至图片的元数据中，并输出处理结果的 JSON 字符串。
+参数：
+ OriginalImagePath (str): 原始图片文件路径，支持本地路径或 URL。
+ ImplicitLabel (str): 隐式标识信息，JSON 格式的字符串，例如：
+ {
+ "Label": "value1",
+ "ContentProducer": "value2",
+ "ProduceID": "value3",
+ "ReservedCode1": "value4",
+ "ContentPropagator": "value5",
+ "PropagateID": "value6",
+ "ReservedCode2": "value7"
+ }
+ ResultFilePath (str): 嵌入标识后图片的输出路径。
+返回：
+ str: JSON 字符串，格式如下：
+ {
+ "status": 1 | 0 | -1 | -2, // 1: 嵌入成功, 0: 无需嵌入, -1: 嵌入失败, -2: 
+执行错误
+ "result": "结果说明"
+ }
+"""
+1.2 元数据隐式标识检测
+def DetectImageImplicitLabel(OriginalImagePath: str) -> str:
+"""
+说明：
+ 检测图片文件元数据中嵌入的隐式标识信息，并输出每条标识项的三元组（key, value, 
+是否合规）。
+参数：
+ OriginalImagePath (str): 图片文件路径，支持本地路径或 URL。
+返回：
+ str: JSON 字符串，格式如下：
+ {
+ "status": 1 | -1 | -2, // 1: 检测成功, -1: 未检测到隐式标识, -2: 执行错误
+ "result": "结果说明",
+ "ImplicitLabel": [
+ ["Label", "value1", true],
+ ["ContentProducer", "value2", true],
+ ["ProduceID", "value3", false],
+ ["ReservedCode1", "value4", true],
+ ["ContentPropagator", "value5", true],
+ ["PropagateID", "value6", true],
+ ["ReservedCode2", "value7", true]
+ ]
+ }
+"""
+1.3 内容显示标识嵌入
+def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, 
+ExplicitLabel: dict) -> str:
+"""
+说明：
+ 在图片上嵌入可视化水印文字，用于显示标识信息。
+参数：
+ OriginalImagePath (str): 原始图片路径，支持本地路径或 URL。
+ ResultFilePath (str): 嵌入标识后的图片输出路径。
+ ExplicitLabel(dict): //下面的value是默认值。
+ {
+ 'LableContent': 'AI生成', //str,显示标识内容,4种组合。
+ 'PositionMode': 1, //int,显示位置模式：1(右下), 2(左下), 3(右上), 4(左上), -
+1(下中), -2(上中), -3(左中), -4(右中)。
+ 'TextDirection': 0, //int,字方向：0(横向), 1(纵向)。
+ 'TextScale': 0.05, //float,文字高度占图像最短边的比例，范围 >= 0.05。
+ 'TextColor': [0, 0, 0], //list,文字颜色，RGB值。
+ 'FontName': 1, //int, 字体名称，1(微软雅黑), 2(宋体), 3(黑体), 4(Arial), 5(Times 
+New Roman)。
+ 'Opacity': 0.5，//float，透明度，范围 0.0 (完全透明) ~ 1.0 (完全不透明)。
+ }
+ 
+返回：
+ str: JSON 字符串，格式如下：
+ {
+ "status": 1 | 0 | -1 | -2, // 1: 嵌入成功, 0: 未嵌入, -1: 嵌入失败, -2: 
+执行错误
+ "result": "结果说明"
+ }
+"""
+1.4 内容显示标识检测
+def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
+"""
+说明：
+ 
+检测图片中已嵌入的显示标识信息，返回显示内容、位置、尺寸等信息的三元组结构，并判断是否合规。
+参数：
+ OriginalImagePath (str): 图片文件路径，支持本地路径或 URL。
+返回：
+ str: JSON 字符串，格式如下：
+ {
+ "status": 1 | -1 | -2, // 1: 检测成功, -1: 未检测到, -2: 执行错误
+ "result": "检测说明",
+ "ExplicitLabel": [
+ ["LableContent", "AI生成", true/false],
+ ["PositionMode", 1, true/false], // 1(右下), 2(左下), ...
+ ["TextScale", 0.05, true/false]
+ ]
+ }
+"""
+2. 视频 (Video)
+2.1 元数据隐式标识嵌入
+def EmbedVideoImplicitLabel(OriginalVideoPath: str, ImplicitLabel: str, 
+ResultFilePath: str) -> str:
+"""
+说明：
+ 将隐式标识信息嵌入至视频的元数据中，并输出处理结果。支持MP4, MOV, AVI, MKV, FLV等格式。
+参数：
+ OriginalVideoPath (str): 原始视频文件路径。
+ ImplicitLabel (str): 隐式标识信息，JSON 格式的字符串。格式同图像。
+ ResultFilePath (str): 嵌入标识后视频的输出路径。
+返回：
+ str: JSON 字符串，格式同图像。
+"""
+2.2 元数据隐式标识检测
+def DetectVideoImplicitLabel(OriginalVideoPath: str) -> str:
+"""
+说明：
+ 检测视频文件元数据中嵌入的隐式标识信息。
+参数：
+ OriginalVideoPath (str): 视频文件路径。
+返回：
+ str: JSON 字符串，格式同图像。
+"""
+2.3 内容显示标识嵌入
+def EmbedVideoExplicitLabel(OriginalVideoPath: str, ResultFilePath: str, 
+ExplicitLabel: dict) -> str:
+"""
+说明：
+ 在视频上嵌入可视化的视觉标识（文字水印）。
+参数：
+ OriginalVideoPath (str): 原始视频路径。
+ ResultFilePath (str): 嵌入标识后的视频输出路径。
+ ExplicitLabel(dict): //下面的value是默认值。
+ {
+ 'LableContent': 'AI生成', //str,显示标识内容,4种组合。
+ 'PositionMode': 1, //int,显示位置模式：1(右下), 2(左下), 3(右上), 4(左上), -
+1(下中), -2(上中), -3(左中), -
+4(右中)。
+ 'TextDirection': 0, //int,字方向：0(横向), 1(纵向)。
+ 'TextScale': 0.05, //float,文字高度占图像最短边的比例，范围 >= 0.05。
+ 'TextColor': [0, 0, 0], //list,文字颜色，RGB值。
+ 'FontName': 1, //int, 字体名称，1(微软雅黑), 2(宋体), 3(黑体), 4(Arial), 5(Times 
+New Roman)。
+ 'Opacity': 0.5，//float，透明度，范围 0.0 (完全透明) ~ 1.0 (完全不透明)。
+ 'StartTime': [0], //int, 起始时间，可以是多个位置，秒为单位
+ 'Duration': 2, //int，持续时间，至少2秒，不能超过（视频时长-起始时间）
+ }
+返回：
+ str: JSON 字符串，格式同图像。
+"""
+2.4 内容显示标识检测
+def DetectVideoExplicitLabel(OriginalVideoPath: str) -> str:
+"""
+说明：
+ 检测视频中已嵌入的视觉显示标识信息。
+参数：
+ OriginalVideoPath (str): 视频文件路径。
+返回：
+ str: JSON 字符串，格式如下：
+ {
+ "status": 1 | -1 | -2,
+ "result": "检测说明",
+ "ExplicitLabel": [
+ ["LableContent", "AI生成", true/false],
+ ["PositionMode", 1, true/false], // 1(右下), 2(左下), ...
+ ["TextScale", 0.05, true/false]
+ ["StartTime", [0], true/false], //文字水印的开始时间，可以是多个位置
+ ["Duration", 5.0, true/false],
+ ]
+ }
+"""
+3. 音频 (Audio)
+3.1 元数据隐式标识嵌入
+def EmbedAudioImplicitLabel(OriginalAudioPath: str, ImplicitLabel: str, 
+ResultFilePath: str) -> str:
+"""
+说明：
+ 将隐式标识信息嵌入至音频的元数据中。支持WAV, MP3, OGG, FLAC, M4A等格式。
+参数：
+ OriginalAudioPath (str): 原始音频文件路径。
+ ImplicitLabel (str): 隐式标识信息，JSON 格式的字符串。格式同图像
+ ResultFilePath (str): 嵌入标识后音频的输出路径。
+返回：
+ str: JSON 字符串，格式同图像。
+"""
+3.2 元数据隐式标识检测
+def DetectAudioImplicitLabel(OriginalAudioPath: str) -> str:
+"""
+说明：
+ 检测音频文件元数据中嵌入的隐式标识信息。
+参数：
+ OriginalAudioPath (str): 音频文件路径。
+返回：
+ str: JSON 字符串，格式同图像。
+"""
+3.3 内容听觉标识嵌入
+def EmbedAudioExplicitLabel(OriginalAudioPath: str, ResultFilePath: str, 
+ExplicitLabel: dict) -> str:
+"""
+说明：
+ 在音频中嵌入听觉标识（语音/节奏标识）。
+参数：
+ OriginalAudioPath (str): 原始音频路径。
+ ResultFilePath (str): 嵌入标识后的音频输出路径。
+ ExplicitLabel (dict):（value的值为默认值）
+ {
+ 'LableAudioPath': 'url', 
+//作为标识的提示音文件路径。有5种提示音，4种文字提示，1种节奏提示（语速120字/秒，萌欣生成）
+ 'Positions': [0], 
+//list，提示音嵌入的开始时间（秒），可以是多个位置，不能超过音频时长。
+ 'Volume': 0, //float, 提示音的音量，范围 -1.0 ~ 1.0，0表示原始音量。
+ 'Speed': 0, //float, 提示音的语速，范围 0.0 ~ 
+1.0，0对应语速120字/秒，1对应语速160字/秒
+ }
+ 
+返回：
+ str: JSON 字符串，格式同图像。
+"""
+3.4 内容听觉标识检测
+def DetectAudioExplicitLabel(OriginalAudioPath: str) -> str:
+"""
+说明：
+ 检测音频中已嵌入的听觉标识信息。
+参数：
+ OriginalAudioPath (str): 音频文件路径。
+返回：
+ str: JSON 字符串，格式如下：
+ {
+ "status": 1 | -1 | -2,
+ "result": "检测说明",
+ "ExplicitLabel": [
+ ["LableMode", "语音标识"/"节奏标识", true/false],
+ ["Positions", [0], true/false], //提示音的开始时间，可以是多个位置
+ ["LableContent", "AI生成", true/false],
+ ]
+ }
+"""
