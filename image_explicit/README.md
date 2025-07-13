@@ -75,7 +75,7 @@ python watermark.py <输入图片> <输出图片> --ExplicitLabel '<JSON配置>'
 | `TextColor` | list | 文字的RGB颜色。 | `'{"TextColor": [255, 0, 0]}'` (红色) |
 | `TextScale` | float | 文字大小，为图片短边高度的比例 (>= 0.05)。 | `'{"TextScale": 0.1}'` |
 | `Opacity` | float | 透明度，范围从 0.0 (完全透明) 到 1.0 (完全不透明)。 | `'{"Opacity": 0.75}'` |
-| `FontName` | int | 字体名称。 **1**:微软雅黑 (默认), **2**:宋体, **3**:黑体, **4**:Arial, **5**:Times New Roman. | `'{"FontName": 2}'` |
+| `FontName` | int | 字体名称。 **1**:微软雅黑 (默认), **2**:宋体, **3**:黑体, **4**:Arial, **5**:Times New Roman. <br>注：当选择字体4或5时，脚本会检查内容。若内容包含"AI"，则进行混合渲染（中文用字体1，英文用所选字体）；若不含"AI"，则自动回退使用字体1。 | `'{"FontName": 4, "ContentMode": 3}'` |
 | `LableContent` | str | **(已弃用)** 直接提供文本内容。会被`ContentMode`覆盖。 | `'{"LableContent": "自定义内容"}'` |
 注：ContentMode与LableContent关系：
 当您运行脚本时，它会首先检查您是否在 --ExplicitLabel 中提供了 ContentMode。
@@ -86,9 +86,9 @@ python watermark.py <输入图片> <输出图片> --ExplicitLabel '<JSON配置>'
 
 同时设置内容为 "人工智能合成" (模式2) 和颜色为黑色:
 ```bash
-python watermark.py test.jpg output.png --ExplicitLabel '{"ContentMode": 2, "TextColor": [0, 0, 0]}'
+python image_explicit.py test.jpg output.png --ExplicitLabel '{"ContentMode": 2, "TextColor": [0, 0, 0]}'
 ```
-
+python image_explicit.py test.jpg output.png --ExplicitLabel '{"ContentMode": 4, "PositionMode": 4, "TextColor": [255, 105, 180], "Opacity": 1.0, "FontName": 4, "TextDirection": 1}'
 ---
 
 ## 3. 返回结果说明

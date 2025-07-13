@@ -64,6 +64,106 @@ def get_default_explicit_label():
         'Opacity': 1.0,
     }
 
+def is_chinese(char):
+    """检查字符是否为中文字符"""
+    return '\u4e00' <= char <= '\u9fff'
+
+def _segment_text(text, special_word="AI"):
+    """
+    将文本分割成中英文片段。特殊处理 "AI" 作为一个整体。
+    """
+    segments = []
+    if not text:
+        return segments
+    
+    # 将文本按 "AI" 分割，保留 "AI"
+    parts = text.split(special_word)
+    for i, part in enumerate(parts):
+        if part:
+            # "AI" 前后的部分，我们仍按常规中英文分割
+            current_segment = ""
+            if not part: continue
+            is_last_char_chinese = is_chinese(part[0])
+            for char in part:
+                current_char_is_chinese = is_chinese(char)
+                if current_char_is_chinese == is_last_char_chinese:
+                    current_segment += char
+                else:
+                    segments.append((current_segment, is_last_char_chinese))
+                    current_segment = char
+                    is_last_char_chinese = current_char_is_chinese
+            segments.append((current_segment, is_last_char_chinese))
+
+        # 在分割点插入 "AI" 片段
+        if i < len(parts) - 1:
+            segments.append((special_word, False)) # "AI" is not Chinese
+            
+    return segments
+
+def get_mixed_text_dimensions(draw, text, english_font, chinese_font):
+    """计算混合字体文本的总尺寸，能处理横向与纵向。"""
+    lines = text.split('\n')
+    max_line_width = 0
+    
+    # 使用 textbbox 计算精确的总高度
+    try:
+        # 混合字体时，无法用单一字体完美计算bbox，但用较大字体(中文)可以得到很好的近似值
+        _, top, _, bottom = draw.textbbox((0, 0), text, font=chinese_font)
+        total_height = bottom - top
+    except ValueError:
+        # 罕见的备用方案
+        total_height = 0
+        for i, line in enumerate(lines):
+             _, line_top, _, line_bottom = draw.textbbox((0, 0), line, font=chinese_font)
+             total_height += (line_bottom - line_top)
+
+    # 逐行计算最大宽度
+    for line in lines:
+        segments = _segment_text(line)
+        current_line_width = 0
+        for segment, is_chinese_seg in segments:
+            font = chinese_font if is_chinese_seg else english_font
+            current_line_width += draw.textlength(segment, font=font)
+        if current_line_width > max_line_width:
+            max_line_width = current_line_width
+            
+    return max_line_width, total_height
+
+def draw_mixed_text(draw, position, text, english_font, chinese_font, fill):
+    """在指定位置绘制混合字体的文本，处理基线对齐和纵向文本。"""
+    x, y = position
+
+    # 如果是纵向文本，则逐行绘制
+    if '\n' in text:
+        lines = text.split('\n')
+        current_y = y
+        for line in lines:
+            # 递归调用自身来绘制单行文本
+            draw_mixed_text(draw, (x, current_y), line, english_font, chinese_font, fill)
+            # 计算该行的高度以便移动到下一行
+            _, line_height = get_mixed_text_dimensions(draw, line, english_font, chinese_font)
+            current_y += line_height
+        return
+
+    # --- 以下为原有的横向文本绘制逻辑 ---
+    current_x = x
+    segments = _segment_text(text)
+
+    # 计算统一的基线
+    eng_ascent, _ = english_font.getmetrics()
+    cn_ascent, _ = chinese_font.getmetrics()
+    max_ascent = max(eng_ascent, cn_ascent)
+
+    for segment, is_segment_chinese in segments:
+        font = chinese_font if is_segment_chinese else english_font
+        # 基于统一的基线调整每个片段的垂直位置
+        segment_ascent, _ = font.getmetrics()
+        draw_y = y + (max_ascent - segment_ascent)
+        
+        draw.text((current_x, draw_y), segment, font=font, fill=fill)
+        current_x += draw.textlength(segment, font=font)
+
+
 def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, ExplicitLabel: dict) -> str:
     """
     在图片上嵌入可视化水印文字,用于显示标识信息。
@@ -105,6 +205,15 @@ def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, Explici
         font_name_key = label_config['FontName']
         opacity = label_config['Opacity']
 
+        # 检查是否需要特殊处理字体4/5
+        use_mixed_render = False
+        if font_name_key in [4, 5]:
+            if "AI" in content:
+                use_mixed_render = True
+            else:
+                # 不含 "AI" 但选了英文字体，直接回退到默认中文字体
+                font_name_key = 1
+
         if not (0.0 <= opacity <= 1.0):
             return json.dumps({"status": -1, "result": "Opacity must be between 0.0 and 1.0."})
         if scale < 0.05:
@@ -129,38 +238,50 @@ def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, Explici
         if img.mode != 'RGBA':
             img = img.convert('RGBA')
 
-        # --- 3. 准备字体和文本 ---
-        font_path = find_font(font_name_key)
-        print(f"Font path search result: '{font_path}' (exists: {os.path.exists(font_path) if font_path else 'N/A'})")
-        if not font_path:
-            # 如果找不到任何指定字体，尝试找一个能用的默认字体
-            font_path = find_font(1) or find_font(4)
-            if not font_path:
-                 return json.dumps({"status": -1, "result": f"Font for ID {font_name_key} not found. Please place fonts in a 'fonts' directory or install WenQuanYi Zen Hei."})
-
+        # --- 3 & 4. 字体准备、位置计算 ---
         img_width, img_height = img.size
         font_size = int(min(img_width, img_height) * scale)
-        
-        try:
-            font = ImageFont.truetype(font_path, font_size)
-        except (IOError, FileNotFoundError):
-            return json.dumps({"status": -2, "result": f"Font file could not be opened or found. Path checked: {font_path}"})
-
         if direction == 1:  # 纵向
             content = '\n'.join(list(content))
 
-        # --- 4. 计算文本位置 ---
         temp_draw = ImageDraw.Draw(Image.new("RGBA", (0,0)))
-        try:
-            # textbbox is preferred for more accurate bounding box
-            _, top, _, bottom = temp_draw.textbbox((0, 0), content, font=font)
-            text_width = temp_draw.textlength(content, font=font)
-            text_height = bottom - top
-        except AttributeError:
-            # Fallback for older Pillow versions
-            text_width, text_height = temp_draw.textsize(content, font=font)
 
-        margin = int(font_size * 0.5) # 边距, 从 0.2 增加到 0.5
+        if use_mixed_render:
+            eng_font_path = find_font(font_name_key)
+            cn_font_path = find_font(1) # 默认中文设为微软雅黑
+            if not eng_font_path or not cn_font_path:
+                return json.dumps({"status": -1, "result": f"Could not find required fonts for mixed rendering. English: {eng_font_path}, Chinese: {cn_font_path}"})
+            
+            try:
+                english_font = ImageFont.truetype(eng_font_path, font_size)
+                chinese_font = ImageFont.truetype(cn_font_path, font_size)
+            except (IOError, FileNotFoundError):
+                return json.dumps({"status": -2, "result": "A font file for mixed rendering could not be opened."})
+            
+            text_width, text_height = get_mixed_text_dimensions(temp_draw, content, english_font, chinese_font)
+        else:
+            font_path = find_font(font_name_key)
+            print(f"Font path search result: '{font_path}' (exists: {os.path.exists(font_path) if font_path else 'N/A'})")
+            if not font_path:
+                font_path = find_font(1) or find_font(4)
+                if not font_path:
+                     return json.dumps({"status": -1, "result": f"Font for ID {font_name_key} not found. Please place fonts in a 'fonts' directory."})
+
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+            except (IOError, FileNotFoundError):
+                return json.dumps({"status": -2, "result": f"Font file could not be opened or found. Path checked: {font_path}"})
+            
+            try:
+                # 使用 textbbox 来同时计算宽度和高度，该方法能正确处理多行文本
+                left, top, right, bottom = temp_draw.textbbox((0, 0), content, font=font)
+                text_width = right - left
+                text_height = bottom - top
+            except AttributeError:
+                # 为旧版Pillow保留的回退方法，可能对多行文本支持不佳
+                text_width, text_height = temp_draw.textsize(content, font=font)
+
+        margin = int(font_size * 0.5)
 
         positions = {
             1: (img_width - text_width - margin, img_height - text_height - margin), # 右下
@@ -179,7 +300,11 @@ def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, Explici
         draw = ImageDraw.Draw(watermark_layer)
         
         text_color_with_opacity = color + (int(255 * opacity),)
-        draw.text((x, y), content, font=font, fill=text_color_with_opacity)
+        
+        if use_mixed_render:
+            draw_mixed_text(draw, (x, y), content, english_font, chinese_font, text_color_with_opacity)
+        else:
+            draw.text((x, y), content, font=font, fill=text_color_with_opacity)
 
         # --- 6. 合成并保存 ---
         result_img = Image.alpha_composite(img, watermark_layer)
