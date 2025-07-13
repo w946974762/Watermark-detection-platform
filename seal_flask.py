@@ -143,4 +143,4 @@ def seal_process():
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=14000,threaded=True,debug=True)
+    app.run(host='0.0.0.0', port=14000,threaded=True)
