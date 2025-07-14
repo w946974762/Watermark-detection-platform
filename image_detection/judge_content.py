@@ -1,28 +1,41 @@
-from typing import List
+from typing import List, Tuple
 import re
 
 def normalize_ai(text: str) -> str:
-    """
-    将常见的AI误识别（如Al、aI、A1等）替换为AI，并统一大写。
-    """
+    # 替换常见误识别（如41、4I、A1、Al、aI、N等为AI）
     # 替换常见误识别
-    text = re.sub(r'\bA[l1iI]\b', 'AI', text, flags=re.IGNORECASE)
-    text = text.upper()
+    text = text.replace('Al', 'AI').replace('A1', 'AI').replace('41', 'AI').replace('4I', 'AI')
+    text = re.sub(r'^4[1I]', 'AI', text, flags=re.IGNORECASE)
+    text = re.sub(r'^A[1lI]', 'AI', text, flags=re.IGNORECASE)
+    text = re.sub(r'^N', 'AI', text, flags=re.IGNORECASE)  # 直接归一化为AI
+    text = text.replace('堡咸', '生成')  # 误识别容错
+    text = text.replace('兀', '人工')  # 误识别容错
+    text = text.replace('船', '能')  # 误识别容错
+    text = re.sub(r'[^\w\u4e00-\u9fff]', '', text)  # 只保留字母、数字、中文
+    text = text.replace(' ', '').upper()
     return text
 
-def judge_content(texts: List[str]) -> str:
+def judge_content(texts: List[str]) -> Tuple[int, str, str, str]:
     """
-    判断识别结果中是否同时包含（“人工智能”或“AI”）和（“生成”或“合成”）的组合，顺序不限。
     返回：
-    - 错误标识：未包含
-    - 具体内容：包含
+    - idx: 匹配到的原始内容索引
+    - result: 原始内容（或拼接内容）
+    - norm_result: 归一化内容
+    - 状态字符串：'合法'/'检测到标识内容但位置错误'/'没有检测到标识'
     """
-    keywords1 = ["人工智能", "AI"]
-    keywords2 = ["生成", "合成"]
-    for text in texts:
+    valid_set = {"人工智能生成", "人工智能合成", "AI生成", "AI合成", "合成AI", "生成AI"}
+    valid_set = {normalize_ai(x) for x in valid_set}
+    # 1. 先判定单个内容
+    if not texts:
+        return None, None, None, "没有检测到标识" 
+    for idx, text in enumerate(texts):
         norm_text = normalize_ai(text)
-        has_k1 = any(k1 in norm_text for k1 in [k.upper() for k in keywords1])
-        has_k2 = any(k2 in norm_text for k2 in [k.upper() for k in keywords2])
-        if has_k1 and has_k2:
-            return text
-    return "错误标识" 
+        if norm_text in valid_set:
+            return idx, text, norm_text, "合格"
+    # 2. 再判定相邻内容拼接
+    for i in range(len(texts)-1):
+        combined = texts[i] + texts[i+1]
+        norm_combined = normalize_ai(combined)
+        if norm_combined in valid_set:
+            return i, combined, norm_combined, "合格"
+    return None, None, None, "检测到错误标识内容"
