@@ -55,7 +55,7 @@ def find_font(font_name_key):
 def get_default_explicit_label():
     """获取默认的水印参数"""
     return {
-        'ContentMode': 3,          # 默认内容为 "AI生成"
+        'LableContent': 3,          # 默认内容模式为 3 ("AI生成")
         'PositionMode': 1,
         'TextDirection': 0,
         'TextScale': 0.08,
@@ -104,56 +104,75 @@ def get_mixed_text_dimensions(draw, text, english_font, chinese_font):
     """计算混合字体文本的总尺寸，能处理横向与纵向。"""
     lines = text.split('\n')
     max_line_width = 0
-    
-    # 使用 textbbox 计算精确的总高度
-    try:
-        # 混合字体时，无法用单一字体完美计算bbox，但用较大字体(中文)可以得到很好的近似值
-        _, top, _, bottom = draw.textbbox((0, 0), text, font=chinese_font)
-        total_height = bottom - top
-    except ValueError:
-        # 罕见的备用方案
-        total_height = 0
-        for i, line in enumerate(lines):
-             _, line_top, _, line_bottom = draw.textbbox((0, 0), line, font=chinese_font)
-             total_height += (line_bottom - line_top)
+    total_height = 0
 
-    # 逐行计算最大宽度
-    for line in lines:
-        segments = _segment_text(line)
-        current_line_width = 0
+    if len(lines) > 1:  # 纵向文本模式
+        vertical_line_spacing_factor = 0.9
+        # 使用较大的字体大小作为基准行高
+        base_line_height = max(english_font.size, chinese_font.size) * vertical_line_spacing_factor
+
+        for line in lines:
+            segments = _segment_text(line)
+            current_line_width = 0
+            for segment, is_chinese_seg in segments:
+                font = chinese_font if is_chinese_seg else english_font
+                current_line_width += draw.textlength(segment, font=font)
+            
+            if current_line_width > max_line_width:
+                max_line_width = current_line_width
+            
+            total_height += base_line_height
+    else:  # 单行横向文本模式
+        segments = _segment_text(text)
+        line_max_ascent = 0
+        line_max_descent = 0
         for segment, is_chinese_seg in segments:
             font = chinese_font if is_chinese_seg else english_font
-            current_line_width += draw.textlength(segment, font=font)
-        if current_line_width > max_line_width:
-            max_line_width = current_line_width
-            
+            max_line_width += draw.textlength(segment, font=font)
+            ascent, descent = font.getmetrics()
+            if ascent > line_max_ascent:
+                line_max_ascent = ascent
+            if descent > line_max_descent:
+                line_max_descent = descent
+        total_height = line_max_ascent + line_max_descent
+
     return max_line_width, total_height
 
 def draw_mixed_text(draw, position, text, english_font, chinese_font, fill):
     """在指定位置绘制混合字体的文本，处理基线对齐和纵向文本。"""
     x, y = position
 
-    # 如果是纵向文本，则逐行绘制
-    if '\n' in text:
-        lines = text.split('\n')
-        current_y = y
-        for line in lines:
-            # 递归调用自身来绘制单行文本
-            draw_mixed_text(draw, (x, current_y), line, english_font, chinese_font, fill)
-            # 计算该行的高度以便移动到下一行
-            _, line_height = get_mixed_text_dimensions(draw, line, english_font, chinese_font)
-            current_y += line_height
-        return
-
-    # --- 以下为原有的横向文本绘制逻辑 ---
-    current_x = x
-    segments = _segment_text(text)
-
-    # 计算统一的基线
+    # 统一计算绘制时所需的基线信息
     eng_ascent, _ = english_font.getmetrics()
     cn_ascent, _ = chinese_font.getmetrics()
     max_ascent = max(eng_ascent, cn_ascent)
 
+    if '\n' in text: # 纵向文本模式
+        lines = text.split('\n')
+        current_y = y
+        
+        vertical_line_spacing_factor = 0.9
+        line_increment = max(english_font.size, chinese_font.size) * vertical_line_spacing_factor
+
+        for line in lines:
+            # --- 开始绘制单行（此处为单个纵向字符） ---
+            current_x_inner = x
+            segments = _segment_text(line)
+            for segment, is_segment_chinese in segments:
+                font = chinese_font if is_segment_chinese else english_font
+                segment_ascent, _ = font.getmetrics()
+                # 基于统一的基线调整每个片段的垂直位置
+                draw_y = current_y + (max_ascent - segment_ascent)
+                draw.text((current_x_inner, draw_y), segment, font=font, fill=fill)
+                current_x_inner += draw.textlength(segment, font=font)
+            # --- 单行绘制结束 ---
+            
+            current_y += line_increment # 使用计算好的固定行高进行递增
+        return
+
+    # --- 单行横向文本模式 ---
+    current_x = x
+    segments = _segment_text(text)
     for segment, is_segment_chinese in segments:
         font = chinese_font if is_segment_chinese else english_font
         # 基于统一的基线调整每个片段的垂直位置
@@ -183,7 +202,7 @@ def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, Explici
         label_config = defaults.copy()
         label_config.update(ExplicitLabel)
 
-        # 新逻辑：根据 ContentMode 或 LableContent 确定水印文本
+        # 新逻辑：LableContent 支持整数模式和直接的字符串输入
         content_options = {
             1: "人工智能生成",
             2: "人工智能合成",
@@ -191,12 +210,19 @@ def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, Explici
             4: "AI合成",
         }
         
-        content_mode = label_config.get('ContentMode')
-        if content_mode in content_options:
-            content = content_options[content_mode]
+        content_input = label_config.get('LableContent')
+        
+        content = ''
+        if isinstance(content_input, int) and content_input in content_options:
+            # 如果是有效的整数模式，获取对应的文本
+            content = content_options[content_input]
+        elif isinstance(content_input, str):
+            # 如果是字符串，直接使用
+            content = content_input
         else:
-            # 向后兼容旧的 LableContent 参数，如果ContentMode不存在，则尝试使用LableContent
-            content = label_config.get('LableContent', 'AI生成')
+            # 对于其他无效输入或没有输入，回退到默认值
+            # 兼容旧的ContentMode
+            content = label_config.get('ContentMode', content_options[get_default_explicit_label()['LableContent']])
 
         position_mode = label_config['PositionMode']
         direction = label_config['TextDirection']
@@ -242,7 +268,17 @@ def EmbedImageExplicitLabel(OriginalImagePath: str, ResultFilePath: str, Explici
         img_width, img_height = img.size
         font_size = int(min(img_width, img_height) * scale)
         if direction == 1:  # 纵向
-            content = '\n'.join(list(content))
+            # 特殊处理纵向文本，让 "AI" 保持在同一行，而不是垂直分开
+            new_content_parts = []
+            i = 0
+            while i < len(content):
+                if content[i:i+2] == 'AI':
+                    new_content_parts.append('AI')
+                    i += 2
+                else:
+                    new_content_parts.append(content[i])
+                    i += 1
+            content = '\n'.join(new_content_parts)
 
         temp_draw = ImageDraw.Draw(Image.new("RGBA", (0,0)))
 
@@ -339,17 +375,20 @@ def main():
     # --- 水印详细参数 ---
     label_help = """
 Watermark settings in JSON format. Example:
-'{"ContentMode": 1, "PositionMode": 3, "Opacity": 0.8}'
+'{"LableContent": 1, "PositionMode": 3, "Opacity": 0.8}'
+'{"LableContent": "自定义文本", "PositionMode": 3, "Opacity": 0.8}'
 
 Settable fields (with defaults):
-  'ContentMode': 3                 // int, Watermark Content. 1:"人工智能生成", 2:"人工智能合成", 3:"AI生成", 4:"AI合成".
-  'LableContent': 'AI生成'         // str, DEPRECATED. Use ContentMode instead.
+  'LableContent': 3                // int|str, (Recommended) Watermark content.
+                                     // Use int mode for presets to avoid encoding issues: 1:"...", 2:"...", 3:"...", 4:"...".
+                                     // Or provide a direct string.
   'PositionMode': 1                // int, Position: 1(BR), 2(BL), 3(TR), 4(TL), -1(BC), -2(TC), -3(LC), -4(RC)
   'TextDirection': 0               // int, Direction: 0(Horizontal), 1(Vertical)
   'TextScale': 0.08                // float, Text height ratio to image's shorter side (>= 0.05)
   'TextColor': [0, 0, 0]           // list, RGB color (e.g., [255, 0, 0] for red)
   'FontName': 1                    // int, Font: 1(MS YaHei), 2(Simsun), 3(Heiti), 4(Arial), 5(Times New Roman)
   'Opacity': 0.5                   // float, Opacity from 0.0 (transparent) to 1.0 (opaque)
+  'ContentMode': 'AI生成'          // str, (DEPRECATED) Use LableContent instead.
 """
     parser.add_argument('--ExplicitLabel', type=str, default='{}', help=label_help)
 

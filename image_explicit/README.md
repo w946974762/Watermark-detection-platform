@@ -69,26 +69,24 @@ python watermark.py <输入图片> <输出图片> --ExplicitLabel '<JSON配置>'
 
 | 参数名 | 类型 | 描述 | 示例 |
 | :--- | :--- | :--- | :--- |
-| `ContentMode` | int | **(推荐)** 水印内容模式。 **1**: "人工智能生成", **2**: "人工智能合成", **3**: "AI生成" (默认), **4**: "AI合成". | `'{"ContentMode": 1}'` |
+| `LableContent` | str | **(推荐)** 水印文本内容。可以是预设的四个值之一（"人工智能生成", "人工智能合成", "AI生成", "AI合成"），也可以是任何自定义字符串。 | `'{"LableContent": "AI合成"}'` |
 | `PositionMode` | int | 水印位置。 **1**:右下, **2**:左下, **3**:右上, **4**:左上, **-1**:下中, **-2**:上中, **-3**:左中, **-4**:右中. | `'{"PositionMode": 4}'` |
 | `TextDirection` | int | 文字方向。**0**: 横向 (默认), **1**: 纵向. | `'{"TextDirection": 1}'` |
 | `TextColor` | list | 文字的RGB颜色。 | `'{"TextColor": [255, 0, 0]}'` (红色) |
 | `TextScale` | float | 文字大小，为图片短边高度的比例 (>= 0.05)。 | `'{"TextScale": 0.1}'` |
 | `Opacity` | float | 透明度，范围从 0.0 (完全透明) 到 1.0 (完全不透明)。 | `'{"Opacity": 0.75}'` |
-| `FontName` | int | 字体名称。 **1**:微软雅黑 (默认), **2**:宋体, **3**:黑体, **4**:Arial, **5**:Times New Roman. <br>注：当选择字体4或5时，脚本会检查内容。若内容包含"AI"，则进行混合渲染（中文用字体1，英文用所选字体）；若不含"AI"，则自动回退使用字体1。 | `'{"FontName": 4, "ContentMode": 3}'` |
-| `LableContent` | str | **(已弃用)** 直接提供文本内容。会被`ContentMode`覆盖。 | `'{"LableContent": "自定义内容"}'` |
-注：ContentMode与LableContent关系：
-当您运行脚本时，它会首先检查您是否在 --ExplicitLabel 中提供了 ContentMode。
-如果提供了 ContentMode，脚本就会根据您给的数字（1, 2, 3, 或 4）选择对应的预设文字，并完全忽略 LableContent。
-如果您没有提供 ContentMode，脚本才会接着去寻找 LableContent，并使用您在里面提供的自定义文本。
+| `FontName` | int | 字体名称。 **1**:微软雅黑 (默认), **2**:宋体, **3**:黑体, **4**:Arial, **5**:Times New Roman. <br>注：当选择字体4或5时，脚本会检查内容。若内容包含"AI"，则进行混合渲染（中文用字体1，英文用所选字体）；若不含"AI"，则自动回退使用字体1。 | `'{"FontName": 4, "LableContent": "AI生成"}'` |
+| `ContentMode` | str | **(已弃用)** 直接提供文本内容。已被`LableContent`取代。 | `'{"ContentMode": "自定义内容"}'` |
+注：LableContent与ContentMode关系：
+当您运行脚本时，它会优先使用 --ExplicitLabel 中的 LableContent 作为水印内容。ContentMode 参数已弃用，建议不再使用。
 
 **组合示例:**
 
-同时设置内容为 "人工智能合成" (模式2) 和颜色为黑色:
+同时设置内容为 "人工智能合成" 和颜色为黑色:
 ```bash
-python image_explicit.py test.jpg output.png --ExplicitLabel '{"ContentMode": 2, "TextColor": [0, 0, 0]}'
+python image_explicit.py test.jpg output.png --ExplicitLabel '{"LableContent": "人工智能合成", "TextColor": [0, 0, 0]}'
 ```
-python image_explicit.py test.jpg output.png --ExplicitLabel '{"ContentMode": 4, "PositionMode": 4, "TextColor": [255, 105, 180], "Opacity": 1.0, "FontName": 4, "TextDirection": 1}'
+python image_explicit.py test.jpg output.png --ExplicitLabel '{"LableContent": "AI合成", "PositionMode": 4, "TextColor": [255, 105, 180], "Opacity": 1.0, "FontName": 4, "TextDirection": 1}'
 ---
 
 ## 3. 返回结果说明
@@ -105,4 +103,4 @@ python image_explicit.py test.jpg output.png --ExplicitLabel '{"ContentMode": 4,
 *   **1**: 嵌入成功。
 *   **0**: 未嵌入 (此版本中未使用)。
 *   **-1**: 嵌入失败 (通常是参数错误)。
-*   **-2**: 执行错误 (通常是文件找不到或程序异常)。 
+*   **-2**: 执行错误 (通常是文件找不到或程序异常)。
