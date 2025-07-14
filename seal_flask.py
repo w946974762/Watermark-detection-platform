@@ -3,9 +3,10 @@ import tempfile
 import json
 import importlib
 from flask import Flask, request, Response, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
-
+CORS(app)
 # 映射前端method到实际函数和模块
 METHOD_MAP = {
     # 图片
@@ -97,7 +98,7 @@ def seal_process():
         if need_output and os.path.exists(output_path):
             with open(output_path, "rb") as fout:
                 file_bytes = fout.read()
-
+                
         # 清理临时文件
         os.remove(input_path)
         if output_path and os.path.exists(output_path):
