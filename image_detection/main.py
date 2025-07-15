@@ -2,8 +2,8 @@ import sys
 import os
 import easyocr
 import cv2
-from judge_content import judge_content
-from judge_position import judge_position
+from .judge_content import judge_content
+from .judge_position import judge_position
 import json
 
 

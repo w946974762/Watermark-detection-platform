@@ -46,10 +46,28 @@ def extract_morse_from_audio(audio_path, unit_ms=120, threshold_db=-30):
     return morse, results
 
 
-def detect_ai_pattern(audio_path, unit_ms=120, threshold_db=-30):
-    """检测音频中AI摩斯码模式，并返回匹配的起始时间和摩斯码内容"""
+def detect_ai_pattern(audio_path, unit_ms=120, threshold_db=-30, start_threshold_ratio=0.15, end_threshold_ratio=0.85):
+    """检测音频中AI摩斯码模式，并返回匹配的起始时间和摩斯码内容
+    
+    Args:
+        audio_path: 音频文件路径
+        unit_ms: 摩斯码单位时间（毫秒）
+        threshold_db: 音频检测阈值（分贝）
+        start_threshold_ratio: 音频开头的阈值比例（0.0-1.0），AI必须出现在此比例之前
+        end_threshold_ratio: 音频结尾的阈值比例（0.0-1.0），AI必须出现在此比例之后
+    """
     morse_code, time_events = extract_morse_from_audio(audio_path, unit_ms, threshold_db)
     ai_morse = mtalk.encode("AI")
+    
+    # 计算音频总时长
+    if time_events:
+        total_duration = time_events[-1][2] + time_events[-1][1]  # 最后一个事件的起始时间 + 持续时间
+    else:
+        total_duration = 0
+    
+    # 计算开头和结尾的时间阈值
+    start_threshold = total_duration * start_threshold_ratio
+    end_threshold = total_duration * end_threshold_ratio
     
     # 统一分隔符格式
     morse_code_std = morse_code.replace('/', '   ')
@@ -57,11 +75,12 @@ def detect_ai_pattern(audio_path, unit_ms=120, threshold_db=-30):
     ai_morse_std = ' '.join(ai_morse.strip().split())
     
     print(f"标准化后摩斯码：{repr(morse_code_std)}")
-    # print(f"标准化后AI摩斯码：{repr(ai_morse_std)}")
+    print(f"标准化后AI摩斯码：{repr(ai_morse_std)}")
+    print(f"音频总时长：{total_duration}ms")
+    # print(f"开头阈值：{start_threshold}ms（{start_threshold_ratio*100}%），结尾阈值：{end_threshold}ms（{end_threshold_ratio*100}%）")
     
     # 如果没有匹配，直接返回空列表
     if ai_morse_std not in morse_code_std:
-        print(f"标准化后AI摩斯码：{repr(ai_morse_std)}")
         return []
     
     # 查找所有匹配的AI摩斯码模式
@@ -71,7 +90,6 @@ def detect_ai_pattern(audio_path, unit_ms=120, threshold_db=-30):
     while True:
         # 查找下一个匹配位置
         match_pos = morse_code_std.find(ai_morse_std, start_pos)
-        print(f"match_pos：{match_pos}")
         if match_pos == -1:
             break
         
@@ -105,11 +123,23 @@ def detect_ai_pattern(audio_path, unit_ms=120, threshold_db=-30):
                 time_offset = start_time
                 break
         
-        # 如果找到了匹配，添加到结果列表
+        # 检查时间位置是否满足要求（开头或结尾）
         if time_offset is not None:
-            matches.append((time_offset, "AI:.- .."))
+            if time_offset <= start_threshold:
+                # AI出现在音频开头
+                matches.append((time_offset, "AI:.- .."))
+                print(f"找到有效AI模式（开头），时间位置：{time_offset}ms（<= {start_threshold}ms）")
+            elif time_offset >= end_threshold:
+                # AI出现在音频结尾
+                matches.append((time_offset, "AI:.- .."))
+                print(f"找到有效AI模式（结尾），时间位置：{time_offset}ms（>= {end_threshold}ms）")
+            else:
+                # AI出现在音频中间，忽略
+                print(f"找到AI模式但位置在中间，时间位置：{time_offset}ms（在{start_threshold}ms和{end_threshold}ms之间），忽略")
         
         # 继续查找下一个匹配
         start_pos = match_pos + 1
     
-    return matches 
+    return matches
+
+
