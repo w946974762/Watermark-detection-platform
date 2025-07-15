@@ -10,7 +10,9 @@ def normalize_ai(text: str) -> str:
     text = re.sub(r'^N', 'AI', text, flags=re.IGNORECASE)  # 直接归一化为AI
     text = text.replace('堡咸', '生成')  # 误识别容错
     text = text.replace('兀', '人工')  # 误识别容错
+    text = text.replace('从', '人工')  # 误识别容错
     text = text.replace('船', '能')  # 误识别容错
+    text = text.replace('INI', 'AI')  # 误识别容错
     text = re.sub(r'[^\w\u4e00-\u9fff]', '', text)  # 只保留字母、数字、中文
     text = text.replace(' ', '').upper()
     return text
