@@ -2,8 +2,8 @@ import sys
 import os
 import easyocr
 import cv2
-from .judge_content import judge_content
-from .judge_position import judge_position
+from judge_content import judge_content
+from judge_position import judge_position
 import json
 
 
@@ -119,6 +119,17 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
         y_coords = [point[1] for point in bbox]
         x, y, w, h = int(min(x_coords)), int(min(y_coords)), int(max(x_coords)-min(x_coords)), int(max(y_coords)-min(y_coords))
 
+        # 获取图片尺寸，计算TextScale为字体高度与图片最短边的比例
+        img = cv2.imread(OriginalImagePath)
+        H, W = img.shape[:2]
+        min_side = min(H, W)
+        y_min = int(min(y_coords))
+        y_max = int(max(y_coords))
+        h = y_max - y_min
+        text_scale = round(h / min_side, 4) if min_side > 0 else 0
+        text_scale = text_scale - 0.01
+        text_scale = round(text_scale, 2)
+
         # 判断位置
         pos_result = judge_position(OriginalImagePath, (x, y, w, h))
         position_mode = pos_result.get('PositionMode', 0)
@@ -128,10 +139,21 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
                 status = status + "位置正确"
             else:
                 status = status + "位置错误"
-                position_mode = None
+                # position_mode = None
         else:
             position_mode = None
+            status = "检测到错误标识内容"
 
+        output = {
+                "status": 1,
+                "result": status,
+                "ExplicitLabel": [
+                    ["LableContent", norm_result, True],
+                    ["PositionMode", position_mode, True],
+                    ["TextScale", text_scale, True]
+                ]
+            }
+        print(json.dumps(output, ensure_ascii=False, indent=2), flush=True)
         # output = {
         #         "status": -1,
         #         "result": status,
@@ -151,7 +173,7 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
                 "ExplicitLabel": [
                     ["LableContent", norm_result, True],
                     ["PositionMode", position_mode, False],
-                    ["TextScale", round(h / min(os.path.getsize(OriginalImagePath), 1000), 2), True]
+                    ["TextScale", text_scale, True]
                 ]
             })
             
@@ -162,11 +184,12 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
                 "ExplicitLabel": [
                     ["LableContent", norm_result, True],
                     ["PositionMode", position_mode, True],
-                    ["TextScale", round(h / min(os.path.getsize(OriginalImagePath), 1000), 2), True]
+                    ["TextScale", text_scale, True]
                 ]
             }, ensure_ascii=False)
                     
-        # if status=="检测到错误标识内容":
+
+        # if status=="没有检测到标识" or status=="检测到错误标识内容":
         #     return json.dumps({
         #         "status": -1,
         #         "result": status,
