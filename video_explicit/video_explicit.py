@@ -4,49 +4,45 @@ import cv2
 import ffmpeg
 import easyocr
 
-def EmbedVideoExplicitLabel(
-    OriginalVideoPath: str,
-    ResultFilePath: str,
-    LableContent: str,
-    PositionMode: int,
-    TextDirection: int,
-    TextScale: float,
-    TextColor: list,
-    FontName: int,  # 现在使用整数索引
-    Opacity: float,
-    StartTime: list,
-    Duration: int
-) -> str:
+def EmbedVideoExplicitLabel(OriginalVideoPath: str, ResultFilePath: str, ExplicitLabel: dict) -> str:
     try:
+        # 从字典中提取参数，设置默认值
+        label_content = ExplicitLabel.get('LableContent', 'AI生成')
+        position_mode = ExplicitLabel.get('PositionMode', 1)
+        text_direction = ExplicitLabel.get('TextDirection', 0)
+        text_scale = ExplicitLabel.get('TextScale', 0.05)
+        text_color = ExplicitLabel.get('TextColor', [0, 0, 0])
+        font_name = ExplicitLabel.get('FontName', 1)
+        opacity = ExplicitLabel.get('Opacity', 0.5)
+        start_time = ExplicitLabel.get('StartTime', [0])
+        duration = ExplicitLabel.get('Duration', 2)
+
         # 检查路径
         if not os.path.exists(OriginalVideoPath):
             return json.dumps({"status": 0, "result": "原始视频路径不存在"}, ensure_ascii=False)
 
         # 验证参数
-        if TextScale < 0.05 or not (0 <= Opacity <= 1.0):
+        if text_scale < 0.05 or not (0 <= opacity <= 1.0):
             return json.dumps({"status": 0, "result": "参数错误：TextScale或Opacity值非法"}, ensure_ascii=False)
 
-        if Duration < 2:
+        if duration < 2:
             return json.dumps({"status": 0, "result": "参数错误：Duration不能小于2秒"}, ensure_ascii=False)
 
-        # 字体映射 - 使用整数索引
+        # 字体映射（整数键到字体文件）
         font_map = {
-            1: "fonts/msyh.ttc",       # 微软雅黑
-            2: "fonts/simsun.ttc",     # 宋体
-            3: "fonts/simhei.ttf",     # 黑体
-            4: "fonts/arial.ttf",      # Arial
-            5: "fonts/times.ttf"       # Times New Roman
+            1: "fonts/msyh.ttc",  # 微软雅黑
+            2: "fonts/simsun.ttc", # 宋体
+            3: "fonts/simhei.ttf", # 黑体
+            4: "fonts/arial.ttf",  # Arial
+            5: "fonts/times.ttf"   # Times New Roman
         }
-        
-        # 检查字体索引是否有效
-        if FontName not in font_map:
-            return json.dumps({"status": 0, "result": "不支持的字体索引"}, ensure_ascii=False)
-        
-        font_file = font_map[FontName]
+        font_file = font_map.get(font_name, None)
+        if not font_file:
+            return json.dumps({"status": 0, "result": "不支持的字体名称"}, ensure_ascii=False)
 
         # 构造颜色和透明度
-        r, g, b = TextColor
-        a = int(255 * Opacity)
+        r, g, b = text_color
+        a = int(255 * opacity)
         fontcolor = f"#{r:02x}{g:02x}{b:02x}{a:02x}"
 
         # 获取视频信息
@@ -55,15 +51,15 @@ def EmbedVideoExplicitLabel(
         if video_stream is None:
             return json.dumps({"status": -1, "result": "未找到视频流"})
 
-        duration = float(probe["format"]["duration"])
-        for st in StartTime:
-            if st < 0 or st + Duration > duration:
+        video_duration = float(probe["format"]["duration"])
+        for st in start_time:
+            if st < 0 or st + duration > video_duration:
                 return json.dumps({"status": 0, "result": f"起始时间 {st} 不合法或超出视频时长"}, ensure_ascii=False)
 
         width = int(video_stream["width"])
         height = int(video_stream["height"])
         min_dim = min(width, height)
-        fontsize = int(TextScale * min_dim)
+        fontsize = int(text_scale * min_dim)
 
         frame_rate = None
         if 'avg_frame_rate' in video_stream:
@@ -75,24 +71,24 @@ def EmbedVideoExplicitLabel(
         bitrate = video_stream.get('bit_rate', None)
 
         # 纵向文字
-        if TextDirection == 1:
-            LableContent = "\n".join(list(LableContent))
+        if text_direction == 1:
+            label_content = "\n".join(list(label_content))
 
         # 位置表达式
         position_expr = {
-            1: f"x=w-tw-10:y=h-th-10",
-            2: f"x=10:y=h-th-10",
-            3: f"x=w-tw-10:y=10",
-            4: f"x=10:y=10",
-            -1: f"x=(w-tw)/2:y=h-th-10",
-            -2: f"x=(w-tw)/2:y=10",
-            -3: f"x=10:y=(h-th)/2",
-            -4: f"x=w-tw-10:y=(h-th)/2"
-        }.get(PositionMode, "x=10:y=10")
+            1: f"x=w-tw-10:y=h-th-10",  # 右下
+            2: f"x=10:y=h-th-10",       # 左下
+            3: f"x=w-tw-10:y=10",       # 右上
+            4: f"x=10:y=10",            # 左上
+            -1: f"x=(w-tw)/2:y=h-th-10", # 下中
+            -2: f"x=(w-tw)/2:y=10",      # 上中
+            -3: f"x=10:y=(h-th)/2",      # 左中
+            -4: f"x=w-tw-10:y=(h-th)/2"  # 右中
+        }.get(position_mode, "x=10:y=10")
 
         drawtext_args_base = {
             "fontfile": font_file,
-            "text": LableContent,
+            "text": label_content,
             "fontsize": fontsize,
             "fontcolor": fontcolor,
             "x": position_expr.split(":")[0][2:],  # 去除 x=
@@ -103,10 +99,9 @@ def EmbedVideoExplicitLabel(
         video_input = ffmpeg.input(OriginalVideoPath)
         video_output = video_input
 
-        for st in StartTime:
+        for st in start_time:
             drawtext_args = drawtext_args_base.copy()
-            drawtext_args["enable"] = f"between(t,{st},{st + Duration})"
-
+            drawtext_args["enable"] = f"between(t,{st},{st + duration})"
             video_output = video_output.drawtext(**drawtext_args)
 
         audio_output = video_input.audio
@@ -296,3 +291,7 @@ def DetectVideoExplicitLabel(OriginalVideoPath: str) -> str:
             "result": f"执行错误: {str(e)}",
             "ExplicitLabel": []
         }, ensure_ascii=False)
+
+
+
+
