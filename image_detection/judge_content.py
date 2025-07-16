@@ -31,13 +31,7 @@ def judge_content(texts: List[str]) -> Tuple[int, str, str, str]:
     if not texts:
         return None, None, None, "没有检测到标识" 
     for idx, text in enumerate(texts):
-        norm_text = normalize_ai(text)
-        if norm_text in valid_set:
-            return idx, text, norm_text, "合格"
-    # 2. 再判定相邻内容拼接
-    for i in range(len(texts)-1):
-        combined = texts[i] + texts[i+1]
-        norm_combined = normalize_ai(combined)
-        if norm_combined in valid_set:
-            return i, combined, norm_combined, "合格"
+        if text in valid_set:
+            return idx, text, text, "合格"
+
     return None, None, None, "检测到错误标识内容"

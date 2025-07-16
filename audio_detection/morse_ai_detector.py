@@ -1,145 +1,42 @@
-import morse_talk as mtalk
-from pydub import AudioSegment, generators
-from pydub.utils import make_chunks
+import numpy as np
+import librosa
+import scipy.signal
 
-def extract_morse_from_audio(audio_path, unit_ms=120, threshold_db=-30):
-    """从音频中提取摩斯码，并返回摩斯码字符串和时间事件列表"""
-    audio = AudioSegment.from_file(audio_path)
-    chunk_ms = 10
-    chunks = make_chunks(audio, chunk_ms)
-    state = "silence"
-    current_len = 0
-    results = []  # 存储 (状态, 持续时间, 起始时间)
-
-    for i, chunk in enumerate(chunks):
-        start_time = i * chunk_ms
-        if chunk.dBFS > threshold_db:
-            if state == "silence" and current_len > 0:
-                results.append(("silence", current_len, start_time - current_len))
-                current_len = 0
-            state = "sound"
-            current_len += chunk_ms
-        else:
-            if state == "sound" and current_len > 0:
-                results.append(("sound", current_len, start_time - current_len))
-                current_len = 0
-            state = "silence"
-            current_len += chunk_ms
-    
-    if current_len > 0:
-        results.append((state, current_len, len(chunks) * chunk_ms - current_len))
-
-    # 解析摩斯码
-    morse = ""
-    for t, l, _ in results:
-        if t == "sound":
-            if l < unit_ms * 1.5:
-                morse += "."
-            else:
-                morse += "-"
-        else:
-            if l >= unit_ms * 7:
-                morse += " / "
-            elif l >= unit_ms * 3:
-                morse += " "
-    
-    return morse, results
+# 固定摩斯码模板音频路径
+MORSE_TEMPLATE_PATH = '/seal_flask/audio_detection/ai_result/morse0.wav'  # 请将此路径替换为你的摩斯码模板音频文件路径
 
 
-def detect_ai_pattern(audio_path, unit_ms=120, threshold_db=-30, start_threshold_ratio=0.15, end_threshold_ratio=0.85):
-    """检测音频中AI摩斯码模式，并返回匹配的起始时间和摩斯码内容
-    
-    Args:
-        audio_path: 音频文件路径
-        unit_ms: 摩斯码单位时间（毫秒）
-        threshold_db: 音频检测阈值（分贝）
-        start_threshold_ratio: 音频开头的阈值比例（0.0-1.0），AI必须出现在此比例之前
-        end_threshold_ratio: 音频结尾的阈值比例（0.0-1.0），AI必须出现在此比例之后
+def load_audio(file_path, sr=16000):
+    audio, _ = librosa.load(file_path, sr=sr)
+    audio = audio / np.max(np.abs(audio))
+    return audio
+
+
+def detect_ai_pattern(input_audio_path, threshold=0.7):
     """
-    morse_code, time_events = extract_morse_from_audio(audio_path, unit_ms, threshold_db)
-    ai_morse = mtalk.encode("AI")
-    
-    # 计算音频总时长
-    if time_events:
-        total_duration = time_events[-1][2] + time_events[-1][1]  # 最后一个事件的起始时间 + 持续时间
-    else:
-        total_duration = 0
-    
-    # 计算开头和结尾的时间阈值
-    start_threshold = total_duration * start_threshold_ratio
-    end_threshold = total_duration * end_threshold_ratio
-    
-    # 统一分隔符格式
-    morse_code_std = morse_code.replace('/', '   ')
-    morse_code_std = ' '.join(morse_code_std.strip().split())
-    ai_morse_std = ' '.join(ai_morse.strip().split())
-    
-    print(f"标准化后摩斯码：{repr(morse_code_std)}")
-    print(f"标准化后AI摩斯码：{repr(ai_morse_std)}")
-    print(f"音频总时长：{total_duration}ms")
-    # print(f"开头阈值：{start_threshold}ms（{start_threshold_ratio*100}%），结尾阈值：{end_threshold}ms（{end_threshold_ratio*100}%）")
-    
-    # 如果没有匹配，直接返回空列表
-    if ai_morse_std not in morse_code_std:
-        return []
-    
-    # 查找所有匹配的AI摩斯码模式
+    检测输入音频中所有摩斯码模板出现的位置。
+    返回: matches = [(起始时间, 'AI:.- ..'), ...]
+    """
+    input_audio = load_audio(input_audio_path)
+    morse_audio = load_audio(MORSE_TEMPLATE_PATH)
+    sr = 16000  # 与load_audio一致
+
+    # 模板匹配
+    correlation = scipy.signal.correlate(input_audio, morse_audio, mode='valid')
+    norm_morse = np.linalg.norm(morse_audio)
+    window_norms = np.array([
+        np.linalg.norm(input_audio[i:i+len(morse_audio)])
+        for i in range(len(correlation))
+    ])
+    correlation = correlation / (norm_morse * window_norms + 1e-8)
+
+    # 找到所有大于阈值的位置
     matches = []
-    start_pos = 0
-    
-    while True:
-        # 查找下一个匹配位置
-        match_pos = morse_code_std.find(ai_morse_std, start_pos)
-        if match_pos == -1:
-            break
-        
-        # 计算匹配的起始时间
-        # 需要找到匹配位置对应的声音事件
-        target_morse = morse_code_std[:match_pos]
-        
-        # 重新构建摩斯码字符串，找到对应的声音事件
-        current_morse = ""
-        time_offset = None
-        
-        for event_type, duration, start_time in time_events:
-            if event_type == "sound":
-                # 根据持续时间判断是点还是划
-                if duration < unit_ms * 1.5:
-                    current_morse += "."
-                else:
-                    current_morse += "-"
-            elif event_type == "silence":
-                # 根据静音持续时间添加分隔符
-                if duration >= unit_ms * 7:
-                    current_morse += " / "
-                elif duration >= unit_ms * 3:
-                    current_morse += " "
-            
-            # 标准化当前摩斯码字符串进行比较
-            current_std = ' '.join(current_morse.strip().split())
-            
-            # 检查是否已经到达或超过目标位置
-            if current_std == target_morse or len(current_std) >= len(target_morse):
-                time_offset = start_time
-                break
-        
-        # 检查时间位置是否满足要求（开头或结尾）
-        if time_offset is not None:
-            if time_offset <= start_threshold:
-                # AI出现在音频开头
-                matches.append((time_offset, "AI:.- .."))
-                print(f"找到有效AI模式（开头），时间位置：{time_offset}ms（<= {start_threshold}ms）")
-            elif time_offset >= end_threshold:
-                # AI出现在音频结尾
-                matches.append((time_offset, "AI:.- .."))
-                print(f"找到有效AI模式（结尾），时间位置：{time_offset}ms（>= {end_threshold}ms）")
-            else:
-                # AI出现在音频中间，忽略
-                print(f"找到AI模式但位置在中间，时间位置：{time_offset}ms（在{start_threshold}ms和{end_threshold}ms之间），忽略")
-        
-        # 继续查找下一个匹配
-        start_pos = match_pos + 1
-    
+    min_distance = int(0.5 * sr)  # 0.5秒内只算一次匹配，避免重复
+    last_idx = -min_distance
+    for idx, value in enumerate(correlation):
+        if value > threshold and (idx - last_idx) > min_distance:
+            start_time = idx / sr
+            matches.append((start_time, 'AI:.- ..'))
+            last_idx = idx
     return matches
-
-

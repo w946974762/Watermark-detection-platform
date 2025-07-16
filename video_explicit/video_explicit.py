@@ -30,11 +30,11 @@ def EmbedVideoExplicitLabel(OriginalVideoPath: str, ResultFilePath: str, Explici
 
         # 字体映射（整数键到字体文件）
         font_map = {
-            1: "fonts/msyh.ttc",  # 微软雅黑
-            2: "fonts/simsun.ttc", # 宋体
-            3: "fonts/simhei.ttf", # 黑体
-            4: "fonts/arial.ttf",  # Arial
-            5: "fonts/times.ttf"   # Times New Roman
+            1: "/seal_flask/video_explicit/fonts/msyh.ttc",  # 微软雅黑
+            2: "/seal_flask/video_explicit/fonts/simsun.ttc", # 宋体
+            3: "/seal_flask/video_explicit/fonts/simhei.ttf", # 黑体
+            4: "/seal_flask/video_explicit/fonts/arial.ttf",  # Arial
+            5: "/seal_flask/video_explicit/fonts/times.ttf"   # Times New Roman
         }
         font_file = font_map.get(font_name, None)
         if not font_file:
