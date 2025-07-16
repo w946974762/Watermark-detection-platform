@@ -10,7 +10,7 @@ def EmbedVideoExplicitLabel(
     TextDirection: int,
     TextScale: float,
     TextColor: list,
-    FontName: str,
+    FontName: int,  # 现在使用整数索引
     Opacity: float,
     StartTime: list,
     Duration: int
@@ -27,17 +27,20 @@ def EmbedVideoExplicitLabel(
         if Duration < 2:
             return json.dumps({"status": 0, "result": "参数错误：Duration不能小于2秒"}, ensure_ascii=False)
 
-        # 字体映射
+        # 字体映射 - 使用整数索引
         font_map = {
-            "宋体": "fonts/simsun.ttc",
-            "微软雅黑": "fonts/msyh.ttc",
-            "黑体": "fonts/simhei.ttf",
-            "Arial": "fonts/arial.ttf",
-            "Times New Roman": "fonts/times.ttf"
+            1: "fonts/msyh.ttc",       # 微软雅黑
+            2: "fonts/simsun.ttc",     # 宋体
+            3: "fonts/simhei.ttf",     # 黑体
+            4: "fonts/arial.ttf",      # Arial
+            5: "fonts/times.ttf"       # Times New Roman
         }
-        font_file = font_map.get(FontName, None)
-        if not font_file:
-            return json.dumps({"status": 0, "result": "不支持的字体名称"}, ensure_ascii=False)
+        
+        # 检查字体索引是否有效
+        if FontName not in font_map:
+            return json.dumps({"status": 0, "result": "不支持的字体索引"}, ensure_ascii=False)
+        
+        font_file = font_map[FontName]
 
         # 构造颜色和透明度
         r, g, b = TextColor
@@ -129,18 +132,18 @@ def EmbedVideoExplicitLabel(
         return json.dumps({"status": -2, "result": f"执行错误: {str(e)}"}, ensure_ascii=False)
 
 
-# 调用示例
-result = EmbedVideoExplicitLabel(
-    OriginalVideoPath='1.mp4',
-    ResultFilePath='output.mp4',
-    LableContent='人工智能合成',
-    PositionMode=1,
-    TextDirection=0,
-    TextScale=0.05,
-    TextColor=[255, 255, 255],
-    FontName='黑体',
-    Opacity=0.7,
-    StartTime=[0],  
-    Duration=5
-)
-print(result)
+# # 调用示例 - 使用字体索引2(宋体)
+# result = EmbedVideoExplicitLabel(
+#     OriginalVideoPath='/root/autodl-tmp/users/pgy/videomark/1.mp4',
+#     ResultFilePath='/root/autodl-tmp/users/pgy/videomark/output.mp4',
+#     LableContent='人工智能合成',
+#     PositionMode=1,
+#     TextDirection=0,
+#     TextScale=0.05,
+#     TextColor=[255, 255, 255],
+#     FontName=2,  # 使用整数索引选择字体
+#     Opacity=0.7,
+#     StartTime=[0],  
+#     Duration=5
+# )
+# print(result)
