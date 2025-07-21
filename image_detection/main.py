@@ -7,7 +7,7 @@ from .judge_position import judge_position
 import json
 import numpy as np
 from .paddle_test import paddle_test
-import traceback
+
 
 
 def pad_image(img, padding=20): 
@@ -66,16 +66,21 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
         print(norm_result)
 
         # 获取对应位置
-        idx = 0  # 默认取第一个识别结果
+        # idx = 0  # 默认取第一个识别结果
         bbox = bboxes[idx]
         # bbox为[x_min, y_min, x_max, y_max]
         x_min, y_min, x_max, y_max = bbox
         h = y_max - y_min
-        # 获取图片尺寸，计算TextScale为字体高度与图片最短边的比例
+        w = x_max - x_min
+        # 获取图片尺寸，计算TextScale
         img = cv2.imread(OriginalImagePath)
         H, W = img.shape[:2]
         min_side = min(H, W)
-        text_scale = round(h / min_side, 2) if min_side > 0 else 0
+        # 判定横向还是竖向
+        if h >= w:
+            text_scale = round(w / min_side, 2) if min_side > 0 else 0
+        else:
+            text_scale = round(h / min_side, 2) if min_side > 0 else 0
         print("TextScale:", text_scale)
         x = x_min
         y = y_min
@@ -172,7 +177,7 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
     except Exception as e:
         return json.dumps({
             "status": -2,
-            "result": f"执行错误: {str(traceback.format_exc())}"
+            "result": f"执行错误: {str(e)}"
         })
 
 if __name__ == "__main__":

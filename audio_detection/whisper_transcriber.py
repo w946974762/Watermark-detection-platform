@@ -1,13 +1,26 @@
-import sys
 import os
 import torch
-sys.path.append(os.path.abspath("/seal_flask/audio_detection/"))
 import whisper
 from typing import Optional, List, Tuple, Dict
 
 # 选择模型大小（根据需求和硬件选择）
 # 可选：tiny, base, small, medium, large
-MODEL_SIZE = "medium"  # 中等大小，平衡速度和准确率
+MODEL_SIZE = "tiny"  # 中等大小，平衡速度和准确率
+
+
+
+# 全局模型变量，仅初始化一次
+_model = None
+_device = "cuda" if torch.cuda.is_available() else "cpu"  # 优先使用GPU
+
+
+def _load_model_once():
+    """全局模型初始化，确保只加载一次"""
+    global _model
+    if _model is None:
+        print(f"首次加载模型 {MODEL_SIZE} 到 {_device}...")
+        _model = whisper.load_model(MODEL_SIZE, device=_device)
+    return _model
 
 
 def transcribe_audio(audio_path: str, language: Optional[str] = None) -> Dict:
@@ -25,17 +38,15 @@ def transcribe_audio(audio_path: str, language: Optional[str] = None) -> Dict:
     if not os.path.exists(audio_path):
         raise FileNotFoundError(f"音频文件不存在: {audio_path}")
 
-    # 加载模型
-    # device = "cuda" if torch.cuda.is_available() else "cpu"
-    device = "cpu"
-    model = whisper.load_model(MODEL_SIZE, device=device)
+    # 复用全局模型（避免重复加载）
+    model = _load_model_once()
 
     # 设置转录参数
     options = {
         "language": language,
         "task": "transcribe",
-        "beam_size": 5,
-        "best_of": 5,
+        "beam_size": 3,
+        "best_of": 3,
         "temperature": 0.0,
         "word_timestamps": True  # 启用词级时间戳
     }

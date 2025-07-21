@@ -33,5 +33,10 @@ def judge_content(texts: List[str]) -> Tuple[int, str, str, str]:
     for idx, text in enumerate(texts):
         if text in valid_set:
             return idx, text, text, "合格"
-
+    # 2. 拼接所有非空内容后判定
+    non_empty_texts = [t for t in texts if t.strip()]
+    concat_text = ''.join(non_empty_texts)
+    if concat_text in valid_set:
+        return 0, concat_text, concat_text, "合格"
+    # 3. 兜底
     return None, None, None, "检测到错误标识内容"

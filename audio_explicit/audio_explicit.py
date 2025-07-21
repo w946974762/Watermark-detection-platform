@@ -24,21 +24,15 @@ def EmbedAudioExplicitLabel(OriginalAudioPath: str, ResultFilePath: str, Explici
      }
     """
     try:
-        label_audio_name = ExplicitLabel.get('LableAudioPath')
-        print(label_audio_name)
-        current_dir = os.path.dirname(__file__)
-        # 提示音基础路径：/seal_flask/audio_explicit/ai_label/
-        label_audio_dir = os.path.join(current_dir, 'ai_label')
-
         # 检查原始音频和标识音是否存在
         if not os.path.exists(OriginalAudioPath):
-            return json.dumps({"status": -1, "result": f"原始音频文件不存在: {OriginalAudioPath}"})
-        if not os.path.exists(os.path.join(label_audio_dir, f"{ExplicitLabel['LableAudioPath']}.wav")):
+            return json.dumps({"status": -1, "result": f"原始音频文件不存在: {OriginalAudioPath}"},ensure_ascii=False)
+        if not os.path.exists(ExplicitLabel['LableAudioPath']):
             return json.dumps({"status": -1, "result": f"标识音文件不存在: {ExplicitLabel['LableAudioPath']}"}, ensure_ascii=False)
 
         # 加载音频
         audio = AudioSegment.from_file(OriginalAudioPath)
-        label = AudioSegment.from_file(os.path.join(label_audio_dir, f"{ExplicitLabel['LableAudioPath']}.wav"))
+        label = AudioSegment.from_file(ExplicitLabel['LableAudioPath'])
 
         # 音量调整
         if 'Volume' in ExplicitLabel:
@@ -71,20 +65,29 @@ def EmbedAudioExplicitLabel(OriginalAudioPath: str, ResultFilePath: str, Explici
             after = output[ms:]
             output = before + label + after
 
-        output.export(ResultFilePath, format="mp3")
+        # 获取输入音频的后缀名（不带点，全部小写）
+        ext = os.path.splitext(OriginalAudioPath)[-1][1:].lower()
+        if not ext:
+            ext = "wav"  # 默认用wav
+        output.export(ResultFilePath, format=ext)
         return json.dumps({"status": 1, "result": f"嵌入成功，输出文件: {ResultFilePath}"},ensure_ascii=False)
     except Exception as e:
         return json.dumps({"status": -2, "result": f"执行错误: {str(e)}"}, ensure_ascii=False)
 
 
+import os
+
+OriginalAudioPath = "ai/real_original.bmp"
+ResultFilePath = os.path.join("ai_results", os.path.basename(OriginalAudioPath))
+
 result = EmbedAudioExplicitLabel(
-    OriginalAudioPath="ai/real_original.wav",
-    ResultFilePath="ai_result/real_ai.mp3",
+    OriginalAudioPath=OriginalAudioPath,
+    ResultFilePath=ResultFilePath,
     ExplicitLabel={
-        "LableAudioPath": "ai_label/voice1.wav",
-        "Positions": [0],  # 在0秒和10秒插入
-        "Volume": -1,
-        "Speed": 0.8
+        "LableAudioPath": "ai_label/morse_val.wav",
+        "Positions": [0,5],
+        "Volume": 0.5,
+        "Speed": 0
     }
 )
 print(result)

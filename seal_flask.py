@@ -4,6 +4,7 @@ import json
 import importlib
 from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
+import mimetypes
 
 app = Flask(__name__)
 CORS(app)
@@ -26,12 +27,12 @@ METHOD_MAP = {
     "DetectAudioExplicitLabel": ("audio_detection.audio_explicit_detector", "DetectAudioExplicitLabel", "audio"),
 }
 
-# 文件类型到mimetype
-MIMETYPE_MAP = {
-    "image": "image/png",
-    "video": "video/mp4",
-    "audio": "audio/wav"
-}
+# # 文件类型到mimetype
+# MIMETYPE_MAP = {
+#     "image": "image/png",
+#     "video": "video/mp4",
+#     "audio": "audio/wav"
+# }
 
 @app.route('/seal_process', methods=['POST'])
 def seal_process():
@@ -46,7 +47,11 @@ def seal_process():
             return jsonify({'error': 'Invalid or missing method'}), 400
 
         module_name, func_name, file_type = METHOD_MAP[method]
-        mimetype = MIMETYPE_MAP.get(file_type, 'application/octet-stream')
+        # 获取上传文件后缀并判断 MIME 类型
+        ext = os.path.splitext(file.filename)[-1]
+        mimetype, _ = mimetypes.guess_type(f"file{ext}")
+        if not mimetype:
+            mimetype = 'application/octet-stream'
 
         # 处理参数
         params = {}
@@ -58,7 +63,7 @@ def seal_process():
                     params[k] = request.form[k]
 
         # 保存上传文件到临时文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[-1]) as tmp_in:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_in:
             tmp_in.write(file.read())
             tmp_in.flush()
             input_path = tmp_in.name
@@ -67,7 +72,7 @@ def seal_process():
         need_output = "Embed" in method
         output_path = None
         if need_output:
-            fd, output_path = tempfile.mkstemp(suffix=os.path.splitext(file.filename)[-1])
+            fd, output_path = tempfile.mkstemp(suffix=ext)
             os.close(fd)
 
         # 动态导入并调用
@@ -113,7 +118,7 @@ def seal_process():
             parts.append(
                 f'--{boundary}\r\n'
                 f'Content-Type: {mimetype}\r\n'
-                f'Content-Disposition: form-data; name="file"; filename="result{os.path.splitext(file.filename)[-1]}"\r\n\r\n'
+                f'Content-Disposition: form-data; name="file"; filename="result{ext}"\r\n\r\n'
             )
             parts.append(file_bytes)
             # part 2: 结果json
