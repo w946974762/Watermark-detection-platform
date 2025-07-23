@@ -5,8 +5,7 @@ def normalize_ai(text: str) -> str:
     # 替换常见误识别（如41、4I、A1、Al、aI、N等为AI）
     # 替换常见误识别
     text = text.replace('Al', 'AI').replace('A1', 'AI').replace('41', 'AI').replace('4I', 'AI')
-    text = re.sub(r'^4[1I]', 'AI', text, flags=re.IGNORECASE)
-    text = re.sub(r'^A[1lI]', 'AI', text, flags=re.IGNORECASE)
+    text = re.sub(r'^A[1lI]?', 'AI', text, flags=re.IGNORECASE) # 修正：A, A1, Al, AI 都可
     text = re.sub(r'^N', 'AI', text, flags=re.IGNORECASE)  # 直接归一化为AI
     text = text.replace('堡咸', '生成')  # 误识别容错
     text = text.replace('兀', '人工')  # 误识别容错
@@ -19,24 +18,42 @@ def normalize_ai(text: str) -> str:
 
 def judge_content(texts: List[str]) -> Tuple[int, str, str, str]:
     """
+    对识别出的文本列表进行内容和拼接判断。
     返回：
-    - idx: 匹配到的原始内容索引
-    - result: 原始内容（或拼接内容）
-    - norm_result: 归一化内容
-    - 状态字符串：'合法'/'检测到标识内容但位置错误'/'没有检测到标识'
+    - idx: 匹配到的原始内容在原始列表中的索引，如果拼接成功则为0。
+    - result: 匹配到的原始内容（或拼接内容）。
+    - norm_result: 归一化后的内容。
+    - 状态字符串：'合格' 或 '没有检测到标识'。
     """
-    valid_set = {"人工智能生成", "人工智能合成", "AI生成", "AI合成", "合成AI", "生成AI"}
-    valid_set = {normalize_ai(x) for x in valid_set}
-    # 1. 先判定单个内容
     if not texts:
-        return None, None, None, "没有检测到标识" 
-    for idx, text in enumerate(texts):
-        if text in valid_set:
-            return idx, text, text, "合格"
-    # 2. 拼接所有非空内容后判定
-    non_empty_texts = [t for t in texts if t.strip()]
-    concat_text = ''.join(non_empty_texts)
-    if concat_text in valid_set:
-        return 0, concat_text, concat_text, "合格"
-    # 3. 兜底
-    return None, None, None, "检测到错误标识内容"
+        return None, None, None, "没有检测到标识"
+
+    normalized_texts = [normalize_ai(t) for t in texts]
+    valid_keywords = {"人工智能生成", "人工智能合成", "A生成", "A合成", "AI生成", "AI合成", "合成AI", "生成AI"}
+    
+    # 1. 检查单个归一化后的文本是否完全匹配
+    for i, norm_text in enumerate(normalized_texts):
+        # 增加对 "A生成" -> "AI生成" 的直接判断
+        if "A生成" in norm_text:
+            norm_text = norm_text.replace("A生成", "AI生成")
+        if "A合成" in norm_text:
+            norm_text = norm_text.replace("A合成", "AI合成")
+            
+        if norm_text in valid_keywords:
+            return i, texts[i], norm_text, "合格"
+
+    # 2. 尝试拼接所有文本进行判断
+    concatenated_text = "".join(normalized_texts)
+    if "A生成" in concatenated_text:
+        concatenated_text = concatenated_text.replace("A生成", "AI生成")
+    if "A合成" in concatenated_text:
+        concatenated_text = concatenated_text.replace("A合成", "AI合成")
+
+    if concatenated_text in valid_keywords:
+        # 如果是拼接成功的，原始文本就是所有非空文本的拼接
+        original_concatenated = "".join([t for t in texts if t and t.strip()])
+        return 0, original_concatenated, concatenated_text, "合格"
+
+    # 3. 如果都匹配不到
+    # 返回第一个识别到的内容作为错误内容
+    return 0, texts[0] if texts else "", normalized_texts[0] if normalized_texts else "", "没有检测到标识"
