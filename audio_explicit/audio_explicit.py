@@ -24,15 +24,21 @@ def EmbedAudioExplicitLabel(OriginalAudioPath: str, ResultFilePath: str, Explici
      }
     """
     try:
+        label_audio_name = ExplicitLabel.get('LableAudioPath')
+        print(label_audio_name)
+        current_dir = os.path.dirname(__file__)
+        # 提示音基础路径：/seal_flask/audio_explicit/ai_label/
+        label_audio_dir = os.path.join(current_dir, 'ai_label')
+        
         # 检查原始音频和标识音是否存在
         if not os.path.exists(OriginalAudioPath):
             return json.dumps({"status": -1, "result": f"原始音频文件不存在: {OriginalAudioPath}"},ensure_ascii=False)
-        if not os.path.exists(ExplicitLabel['LableAudioPath']):
+        if not os.path.exists(os.path.join(label_audio_dir, f"{ExplicitLabel['LableAudioPath']}.wav")):
             return json.dumps({"status": -1, "result": f"标识音文件不存在: {ExplicitLabel['LableAudioPath']}"}, ensure_ascii=False)
 
         # 加载音频
         audio = AudioSegment.from_file(OriginalAudioPath)
-        label = AudioSegment.from_file(ExplicitLabel['LableAudioPath'])
+        label = AudioSegment.from_file(os.path.join(label_audio_dir, f"{ExplicitLabel['LableAudioPath']}.wav"))
 
         # 音量调整
         if 'Volume' in ExplicitLabel:
@@ -77,17 +83,17 @@ def EmbedAudioExplicitLabel(OriginalAudioPath: str, ResultFilePath: str, Explici
 
 import os
 
-OriginalAudioPath = "ai/real_original.bmp"
-ResultFilePath = os.path.join("ai_results", os.path.basename(OriginalAudioPath))
+# OriginalAudioPath = "ai/real_original.bmp"
+# ResultFilePath = os.path.join("ai_results", os.path.basename(OriginalAudioPath))
 
-result = EmbedAudioExplicitLabel(
-    OriginalAudioPath=OriginalAudioPath,
-    ResultFilePath=ResultFilePath,
-    ExplicitLabel={
-        "LableAudioPath": "ai_label/morse_val.wav",
-        "Positions": [0,5],
-        "Volume": 0.5,
-        "Speed": 0
-    }
-)
-print(result)
+# result = EmbedAudioExplicitLabel(
+#     OriginalAudioPath=OriginalAudioPath,
+#     ResultFilePath=ResultFilePath,
+#     ExplicitLabel={
+#         "LableAudioPath": "ai_label/morse_val.wav",
+#         "Positions": [0,5],
+#         "Volume": 0.5,
+#         "Speed": 0
+#     }
+# )
+# print(result)
