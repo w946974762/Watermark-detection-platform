@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple, Dict
 
 # 选择模型大小（根据需求和硬件选择）
 # 可选：tiny, base, small, medium, large
-MODEL_SIZE = "tiny"  # 中等大小，平衡速度和准确率
+MODEL_SIZE = "base"  # 中等大小，平衡速度和准确率
 
 
 
