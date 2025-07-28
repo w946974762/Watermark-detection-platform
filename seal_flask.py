@@ -5,6 +5,7 @@ import importlib
 from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 import mimetypes
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -147,6 +148,27 @@ def seal_process():
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+    
+TARGET_URL = 'http://localhost:13000/detect'
 
+@app.route('/api/detect', methods=['POST'])
+def proxy_detect():
+    try:
+        # 检查是否有文件上传
+        if 'file' not in request.files:
+            return jsonify({'status': 'error', 'message': '请通过 form-data 上传 file 参数'}), 400
+
+        file = request.files['file']
+
+        # 使用 requests 转发文件到目标 Flask 服务
+        files = {'file': (file.filename, file.stream, file.mimetype)}
+        response = requests.post(TARGET_URL, files=files)
+
+        # 将返回结果原样返回
+        return jsonify(response.json()), response.status_code
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'代理转发失败: {str(e)}'}), 500
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=14000,threaded=True)

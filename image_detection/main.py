@@ -145,6 +145,7 @@ def DetectImageExplicitLabel(OriginalImagePath: str) -> str:
         # print(json.dumps(output, ensure_ascii=False, indent=2), flush=True)
         return json.dumps(output, ensure_ascii=False, indent=2)
 
+
     except Exception as e:
         # 捕获任何可能的异常，并以标准格式返回
         return json.dumps({

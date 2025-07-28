@@ -15,9 +15,10 @@ def judge_position(image_path: str, region: Tuple[int, int, int, int], edge_rati
     x, y, w, h = region
     min_side = min(H, W)
     
-    # 判断高度是否满足最低要求
-    if h < min_side * edge_ratio:
-        return {"PositionMode": 0}  # 不符合最小高度要求
+    # # 判断高度是否满足最低要求
+    # if h < min_side * edge_ratio:
+    #     return {"PositionMode": 0}  # 不符合最小高度要求
+
 
     margin = int(min_side * edge_ratio)
 
